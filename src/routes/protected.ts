@@ -2,11 +2,10 @@
 // src/routes/protected.ts
 
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db/prisma'; // Import the shared prisma instance
 import { AuthRequest, authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.get(
   '/profile',

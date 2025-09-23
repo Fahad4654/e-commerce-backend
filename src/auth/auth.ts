@@ -1,14 +1,12 @@
-
 // src/auth/auth.ts
-
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { User } from '../models/user';
+import { User } from '@prisma/client';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-console.log(JWT_SECRET)
+
 if (JWT_SECRET === 'your_jwt_secret') {
-  console.warn('Warning: JWT_SECRET is not set. Using a default value.');
+  console.warn('Warning: JWT_SECRET is not set. Using a default value in production is insecure.');
 }
 
 export const hashPassword = async (password: string): Promise<string> => {
@@ -24,15 +22,37 @@ export const comparePasswords = async (
 };
 
 export const generateToken = (user: User): string => {
-  return jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
-    expiresIn: '1h',
-  });
+  // Only include non-sensitive information in the token
+  return jwt.sign(
+    { 
+      id: user.id, 
+      email: user.email, 
+      isAdmin: user.isAdmin 
+    }, 
+    JWT_SECRET, 
+    { 
+      expiresIn: '1h' 
+    }
+  );
 };
 
-export const verifyToken = (token: string): any => {
+export const verifyToken = (token: string): { id: number; email: string; isAdmin: boolean } | null => {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET) as { id: number; email: string; isAdmin: boolean };
   } catch (error) {
+    console.error('Token verification failed:', error);
     return null;
   }
+};
+
+// Optional: Add a function to get user from token
+export const getUserFromToken = (token: string): Pick<User, 'id' | 'email' | 'isAdmin'> | null => {
+  const payload = verifyToken(token);
+  if (!payload) return null;
+  
+  return {
+    id: payload.id,
+    email: payload.email,
+    isAdmin: payload.isAdmin
+  };
 };
