@@ -1,9 +1,14 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "module": "commonjs",
     "sourceMap": true,
     "outDir": "dist",
-    "esModuleInterop": true
+    "strict": true,
+    "lib": ["esnext"],
+    "esModuleInterop": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }
