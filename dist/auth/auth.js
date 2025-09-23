@@ -8,6 +8,7 @@ exports.verifyToken = exports.generateToken = exports.comparePasswords = exports
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+console.log(JWT_SECRET);
 if (JWT_SECRET === 'your_jwt_secret') {
     console.warn('Warning: JWT_SECRET is not set. Using a default value.');
 }
