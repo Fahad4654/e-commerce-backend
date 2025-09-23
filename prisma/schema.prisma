@@ -17,6 +17,8 @@ model User {
   password  String
   createdAt DateTime @default(now())
   isAdmin   Boolean  @default(false)
+  address   String?
+  phone     String?
 
   cart   Cart?
   orders Order[]
@@ -56,11 +58,15 @@ model CartItem {
 }
 
 model Order {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
-  createdAt DateTime @default(now())
-  total     Float
+  id              Int      @id @default(autoincrement())
+  user            User     @relation(fields: [userId], references: [id])
+  userId          Int
+  createdAt       DateTime @default(now())
+  total           Float
+  shippingAddress String
+  phone           String
+  paymentMethod   String
+  shippingMethod  String
 
   items OrderItem[]
 }

@@ -6,7 +6,7 @@ import { hashPassword, comparePasswords, generateToken } from '../auth/auth';
 import prisma from '../db/prisma';
 
 export const register = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, address, phone } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required' });
@@ -18,6 +18,8 @@ export const register = async (req: Request, res: Response) => {
       data: {
         email,
         password: hashedPassword,
+        address,
+        phone,
       },
     });
     res.status(201).json({ message: 'User created successfully', userId: user.id });
