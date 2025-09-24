@@ -1,22 +1,13 @@
 
 import { Request, Response } from 'express';
-import prisma from '../db/prisma';
+import * as cartService from '../services/cartService';
 
 // Get the user's cart
 export const getCart = async (req: Request, res: Response) => {
   const userId = req.user.id;
 
   try {
-    const cart = await prisma.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          include: {
-            product: true,
-          },
-        },
-      },
-    });
+    const cart = await cartService.getCart(userId);
 
     if (!cart) {
       return res.status(404).json({ message: 'Cart not found' });
@@ -38,38 +29,12 @@ export const addItemToCart = async (req: Request, res: Response) => {
   }
 
   try {
-    const cart = await prisma.cart.findUnique({ where: { userId } });
-
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-
-    const existingItem = await prisma.cartItem.findFirst({
-      where: {
-        cartId: cart.id,
-        productId,
-      },
-    });
-
-    if (existingItem) {
-      // If item exists, update the quantity
-      await prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: existingItem.quantity + quantity },
-      });
-    } else {
-      // If item doesn't exist, create a new cart item
-      await prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId,
-          quantity,
-        },
-      });
-    }
-
-    res.status(200).json({ message: 'Item added to cart' });
+    const cartItem = await cartService.addItemToCart(userId, productId, quantity);
+    res.status(200).json(cartItem);
   } catch (error) {
+    if (error.message === 'Not enough stock available' || error.message === 'Product not found') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Error adding item to cart', error });
   }
 };
@@ -85,29 +50,12 @@ export const updateCartItem = async (req: Request, res: Response) => {
   }
 
   try {
-    const cart = await prisma.cart.findUnique({ where: { userId } });
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-
-    const cartItem = await prisma.cartItem.findFirst({
-      where: {
-        id: parseInt(itemId),
-        cartId: cart.id,
-      },
-    });
-
-    if (!cartItem) {
-      return res.status(404).json({ message: 'Cart item not found' });
-    }
-
-    await prisma.cartItem.update({
-      where: { id: parseInt(itemId) },
-      data: { quantity },
-    });
-
-    res.status(200).json({ message: 'Cart item updated' });
+    const updatedItem = await cartService.updateCartItem(userId, parseInt(itemId), quantity);
+    res.status(200).json(updatedItem);
   } catch (error) {
+    if (error.message === 'Not enough stock available' || error.message === 'Cart item not found') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Error updating cart item', error });
   }
 };
@@ -118,26 +66,12 @@ export const removeCartItem = async (req: Request, res: Response) => {
   const { itemId } = req.params;
 
   try {
-    const cart = await prisma.cart.findUnique({ where: { userId } });
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-
-    const cartItem = await prisma.cartItem.findFirst({
-      where: {
-        id: parseInt(itemId),
-        cartId: cart.id,
-      },
-    });
-
-    if (!cartItem) {
-      return res.status(404).json({ message: 'Cart item not found' });
-    }
-
-    await prisma.cartItem.delete({ where: { id: parseInt(itemId) } });
-
+    await cartService.removeCartItem(userId, parseInt(itemId));
     res.status(200).json({ message: 'Cart item removed' });
   } catch (error) {
+    if (error.message === 'Cart item not found') {
+      return res.status(404).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Error removing cart item', error });
   }
 };
