@@ -1,3 +1,4 @@
+
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -7,6 +8,7 @@ import authRoutes from './routes/auth';
 import protectedRoutes from './routes/protected';
 import productRoutes from './routes/product'; // Import product routes
 import orderRoutes from './routes/order'; // Import order routes
+import { createAdminUserIfNotExists } from './utils/startup';
 
 const app = express();
 
@@ -24,6 +26,15 @@ app.get('/', (req, res) => {
 });
 
 const port = parseInt(process.env.PORT || '3000');
-app.listen(port, () => {
-  console.log(`Server is listening on port ${port}`);
-});
+
+// Create admin user on startup
+createAdminUserIfNotExists()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server is listening on port ${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to create admin user:', error);
+    process.exit(1);
+  });
