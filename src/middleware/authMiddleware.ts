@@ -5,6 +5,7 @@ import { verifyToken } from '../auth/auth';
 // Define the custom request type that includes the user property
 export type AuthRequest = ExpressRequest & {
   user?: any; // Consider creating a more specific user type
+  guestId?: string;
 };
 
 export const authMiddleware = (

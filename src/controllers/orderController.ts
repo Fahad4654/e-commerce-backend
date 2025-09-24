@@ -7,7 +7,12 @@ import { OrderStatus } from '@prisma/client'; // Import the enum
 // Create a new order
 export const createOrder = async (req: AuthRequest, res: Response) => {
   const { shippingAddress, phone, paymentMethod, shippingMethod } = req.body;
-  const userId = req.user.id;
+  const userId = req.user?.id;
+  const guestId = req.guestId;
+
+  if (!userId && !guestId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   if (!shippingAddress || !phone || !paymentMethod || !shippingMethod) {
     return res.status(400).json({ 
@@ -18,8 +23,9 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
     // Start a transaction to ensure atomicity
     const newOrder = await prisma.$transaction(async (prisma) => {
+      const cartIdentifier = userId ? { userId } : { guestId };
       const userCart = await prisma.cart.findUnique({
-        where: { userId },
+        where: cartIdentifier,
         include: { items: { include: { product: true } } },
       });
 
@@ -31,23 +37,30 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         return acc + item.quantity * item.product.price;
       }, 0);
 
-      const order = await prisma.order.create({
-        data: {
-          userId,
-          total,
-          shippingAddress,
-          phone,
-          paymentMethod,
-          shippingMethod,
-          status: 'processing', // Default status
-          items: {
-            create: userCart.items.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.product.price,
-            })),
-          },
+      const orderData: any = {
+        total,
+        shippingAddress,
+        phone,
+        paymentMethod,
+        shippingMethod,
+        status: 'processing', // Default status
+        items: {
+          create: userCart.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.product.price,
+          })),
         },
+      };
+
+      if (userId) {
+        orderData.userId = userId;
+      } else if (guestId) {
+        orderData.guestId = guestId;
+      }
+
+      const order = await prisma.order.create({
+        data: orderData,
         include: { items: true },
       });
 

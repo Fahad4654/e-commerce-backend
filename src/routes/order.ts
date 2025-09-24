@@ -6,19 +6,20 @@ import {
   updateOrderStatus,
 } from '../controllers/orderController';
 import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware';
+import { guestMiddleware } from '../middleware/guestMiddleware';
 
 const router = Router();
 
-// All order routes are protected
-router.use(authMiddleware);
+// POST /api/orders - Create a new order (for all authenticated users and guests)
+router.post('/', authMiddleware, guestMiddleware, createOrder);
 
-// POST /api/orders - Create a new order (for all authenticated users)
-router.post('/', createOrder);
+// All other order routes are protected and for admins only
+router.use(authMiddleware, adminMiddleware);
 
 // GET /api/orders - Get all orders (admins only)
-router.get('/', adminMiddleware, getAllOrders);
+router.get('/', getAllOrders);
 
 // PUT /api/orders/:orderId/status - Update order status (admins only)
-router.put('/:orderId/status', adminMiddleware, updateOrderStatus);
+router.put('/:orderId/status', updateOrderStatus);
 
 export default router;

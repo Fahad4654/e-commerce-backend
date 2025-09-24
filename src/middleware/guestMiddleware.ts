@@ -1,16 +1,16 @@
 
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthRequest } from './authMiddleware';
 
-export const guestMiddleware = (req: Request, res: Response, next: NextFunction) => {
-    if (req.cookies.guestId) {
-        // If guestId cookie exists, do nothing
-        return next();
+export const guestMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+    let guestId = req.cookies.guestId;
+
+    if (!guestId) {
+        guestId = uuidv4();
+        res.cookie('guestId', guestId, { maxAge: 900000, httpOnly: true });
     }
-    // If guestId cookie does not exist, generate a new guest ID and set it as a cookie
-    const guestId = uuidv4();
-    res.cookie('guestId', guestId, { maxAge: 900000, httpOnly: true });
-    (req as any).guestId = guestId;
+
+    req.guestId = guestId;
     next();
 };
-
