@@ -1,4 +1,4 @@
-
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -11,6 +11,7 @@ import orderRoutes from './routes/order'; // Import order routes
 const app = express();
 
 app.use(express.json());
+app.use(cookieParser());
 
 // API Routes
 app.use('/api/auth', authRoutes);

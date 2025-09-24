@@ -97,7 +97,22 @@ export const refreshToken = async (req: Request, res: Response) => {
     return res.status(403).json({ message: 'Invalid refresh token' });
   }
 
-  const { accessToken } = generateTokens(user);
+  // Generate new tokens
+  const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
+
+  // Store the new hashed refresh token in the database
+  const hashedRefreshToken = await hash(newRefreshToken, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshToken: hashedRefreshToken },
+  });
+
+  // Send the new refresh token as a cookie
+  res.cookie('refreshToken', newRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
 
   res.json({ accessToken });
 };
