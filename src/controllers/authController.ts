@@ -21,6 +21,9 @@ export const register = async (req: Request, res: Response) => {
         password: hashedPassword,
         address,
         phone,
+        cart: {
+          create: {},
+        },
       },
     });
     res.status(201).json({ message: 'User created successfully', userId: user.id });
