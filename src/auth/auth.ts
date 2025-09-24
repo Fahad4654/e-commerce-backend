@@ -31,7 +31,7 @@ export const generateAccessToken = (user: User): string => {
       { 
         id: user.id, 
         email: user.email, 
-        isAdmin: user.isAdmin 
+        isAdmin: user.role === 'admin' 
       }, 
       JWT_SECRET, 
       { 
@@ -45,7 +45,7 @@ export const generateAccessToken = (user: User): string => {
       { 
         id: user.id, 
         email: user.email,
-        isAdmin: user.isAdmin
+        isAdmin: user.role === 'admin'
       }, 
       REFRESH_TOKEN_SECRET, 
       { 
@@ -71,7 +71,7 @@ export const verifyToken = (token: string, isRefreshToken = false): { id: number
   };
 
 // Optional: Add a function to get user from token
-export const getUserFromToken = (token: string): Pick<User, 'id' | 'email' | 'isAdmin'> | null => {
+export const getUserFromToken = (token: string): { id: number; email: string; isAdmin: boolean } | null => {
   const payload = verifyToken(token);
   if (!payload) return null;
   

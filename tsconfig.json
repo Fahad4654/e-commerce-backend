@@ -7,8 +7,8 @@
       "esnext"
     ],
     "esModuleInterop": true,
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "commonjs",
+    "moduleResolution": "node",
     "target": "ES2022",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true

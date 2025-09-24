@@ -17,7 +17,6 @@ router.get(
         select: {
           id: true,
           email: true,
-          createdAt: true,
           address: true,
           phone: true,
         },
