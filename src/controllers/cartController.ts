@@ -1,11 +1,20 @@
 
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import * as cartService from '../services/cartService';
 
+interface CartRequest extends Request {
+    user?: any;
+    cookies: { [key: string]: string };
+}
+
 // Get the user's cart
-export const getCart = async (req: AuthRequest, res: Response) => {
-  const userId = req.user.id;
+export const getCart = async (req: CartRequest, res: Response) => {
+  const userId = req.user ? req.user.id : req.cookies.guestId;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   try {
     const cart = await cartService.getCart(userId);
@@ -22,9 +31,13 @@ export const getCart = async (req: AuthRequest, res: Response) => {
 };
 
 // Add an item to the cart
-export const addItemToCart = async (req: AuthRequest, res: Response) => {
-  const userId = req.user.id;
+export const addItemToCart = async (req: CartRequest, res: Response) => {
+  const userId = req.user ? req.user.id : req.cookies.guestId;
   const { productId, quantity } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   if (!productId || !quantity) {
     return res.status(400).json({ message: 'Product ID and quantity are required' });
@@ -45,10 +58,14 @@ export const addItemToCart = async (req: AuthRequest, res: Response) => {
 };
 
 // Update a cart item
-export const updateCartItem = async (req: AuthRequest, res: Response) => {
-  const userId = req.user.id;
+export const updateCartItem = async (req: CartRequest, res: Response) => {
+  const userId = req.user ? req.user.id : req.cookies.guestId;
   const { itemId } = req.params;
   const { quantity } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   if (!quantity) {
     return res.status(400).json({ message: 'Quantity is required' });
@@ -69,9 +86,13 @@ export const updateCartItem = async (req: AuthRequest, res: Response) => {
 };
 
 // Remove an item from the cart
-export const removeCartItem = async (req: AuthRequest, res: Response) => {
-  const userId = req.user.id;
+export const removeCartItem = async (req: CartRequest, res: Response) => {
+  const userId = req.user ? req.user.id : req.cookies.guestId;
   const { itemId } = req.params;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
   try {
     await cartService.removeCartItem(userId, parseInt(itemId));

@@ -10,11 +10,13 @@ import productRoutes from './routes/product'; // Import product routes
 import orderRoutes from './routes/order'; // Import order routes
 import cartRoutes from './routes/cart'; // Import cart routes
 import { createAdminUserIfNotExists } from './utils/startup';
+import { guestMiddleware } from './middleware/guestMiddleware';
 
 const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(guestMiddleware);
 
 // API Routes
 app.use('/api/auth', authRoutes);
