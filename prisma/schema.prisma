@@ -19,6 +19,7 @@ model User {
   isAdmin   Boolean  @default(false)
   address   String?
   phone     String?
+  refreshToken String?
 
   cart   Cart?
   orders Order[]
