@@ -1,11 +1,10 @@
 
-// src/middleware/authMiddleware.ts
-
 import { Request as ExpressRequest, Response, NextFunction } from 'express';
 import { verifyToken } from '../auth/auth';
 
+// Define the custom request type that includes the user property
 export type AuthRequest = ExpressRequest & {
-  user?: any;
+  user?: any; // Consider creating a more specific user type
 };
 
 export const authMiddleware = (
@@ -19,11 +18,23 @@ export const authMiddleware = (
   }
 
   const token = authHeader.split(' ')[1];
-  const decoded = verifyToken(token);
-  if (!decoded) {
+  try {
+    const decoded = verifyToken(token);
+    req.user = decoded;
+    next();
+  } catch (error) {
     return res.status(401).json({ message: 'Invalid token' });
   }
+};
 
-  req.user = decoded;
-  next();
+export const adminMiddleware = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Forbidden: Admins only' });
+  }
 };

@@ -1,10 +1,10 @@
 
-// src/controllers/orderController.ts
-
 import { Response } from 'express';
 import prisma from '../db/prisma';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { OrderStatus } from '@prisma/client'; // Import the enum
 
+// Create a new order
 export const createOrder = async (req: AuthRequest, res: Response) => {
   const { shippingAddress, phone, paymentMethod, shippingMethod } = req.body;
   const userId = req.user.id;
@@ -18,28 +18,19 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
     // Start a transaction to ensure atomicity
     const newOrder = await prisma.$transaction(async (prisma) => {
-      // 1. Find the user's cart and include the cart items and product details
       const userCart = await prisma.cart.findUnique({
         where: { userId },
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-        },
+        include: { items: { include: { product: true } } },
       });
 
       if (!userCart || userCart.items.length === 0) {
         throw new Error('Your cart is empty. Add items before creating an order.');
       }
 
-      // 2. Calculate the total price of the order
       const total = userCart.items.reduce((acc, item) => {
         return acc + item.quantity * item.product.price;
       }, 0);
 
-      // 3. Create the order
       const order = await prisma.order.create({
         data: {
           userId,
@@ -48,6 +39,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
           phone,
           paymentMethod,
           shippingMethod,
+          status: 'processing', // Default status
           items: {
             create: userCart.items.map((item) => ({
               productId: item.productId,
@@ -56,25 +48,62 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
             })),
           },
         },
-        include: {
-          items: true, // Include order items in the response
-        },
+        include: { items: true },
       });
 
-      // 4. Clear the user's cart by deleting all cart items
-      await prisma.cartItem.deleteMany({
-        where: { cartId: userCart.id },
-      });
+      await prisma.cartItem.deleteMany({ where: { cartId: userCart.id } });
 
       return order;
     });
 
     res.status(201).json({ message: 'Order created successfully', order: newOrder });
   } catch (error) {
-    console.error('Error creating order:', error);
-    if (error instanceof Error) {
-      return res.status(400).json({ message: error.message || 'Error creating order' });
-    }
-    res.status(500).json({ message: 'Error creating order', error });
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ message: 'Error creating order', error: message });
+  }
+};
+
+// Get all orders (for admins)
+export const getAllOrders = async (req: AuthRequest, res: Response) => {
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        user: { select: { id: true, name: true, email: true } }, // Include user details
+        items: { include: { product: true } }, // Include order items and products
+      },
+      orderBy: {
+        createdAt: 'desc', // Show newest orders first
+      },
+    });
+    res.json(orders);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ message: 'Error fetching orders', error: message });
+  }
+};
+
+// Update order status (for admins)
+export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  // Validate the new status
+  if (!status || !Object.values(OrderStatus).includes(status)) {
+    return res.status(400).json({ 
+      message: 'Invalid status. Must be one of: processing, delivered, completed' 
+    });
+  }
+
+  try {
+    const updatedOrder = await prisma.order.update({
+      where: { id: parseInt(orderId) },
+      data: { status },
+      include: { items: true, user: { select: { id: true, name: true } } },
+    });
+
+    res.json({ message: 'Order status updated successfully', order: updatedOrder });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ message: 'Error updating order status', error: message });
   }
 };

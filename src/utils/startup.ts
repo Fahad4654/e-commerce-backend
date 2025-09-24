@@ -30,8 +30,11 @@ export const createAdminUserIfNotExists = async () => {
         email: adminEmail,
         password: hashedPassword,
         phone: adminPhone,
-        isAdmin: true,
+        role: 'admin',
         address: 'Admin Address', // You can make this configurable if needed
+        cart: {
+          create: {},
+        },
       },
     });
     console.log('Admin user created successfully.');
