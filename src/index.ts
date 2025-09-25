@@ -20,7 +20,21 @@ app.use(guestMiddleware);
 
 // Middleware to log all incoming requests
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(
+    JSON.stringify(
+      {
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        query: req.query,
+        params: req.params,
+        body: req.body,
+        cookies: req.cookies,
+      },
+      null,
+      2
+    )
+  );
   next();
 });
 
