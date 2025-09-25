@@ -15,6 +15,7 @@ import { logRoutes } from "./utils/routeLogger";
 const app = express();
 
 app.use(express.json());
+app.use('/public', express.static('public'));
 app.use(cookieParser());
 app.use(guestMiddleware);
 

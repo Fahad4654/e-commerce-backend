@@ -43,6 +43,7 @@ export const createProduct = async (req: Request, res: Response) => {
         description,
         price,
         stock,
+        images: [],
       },
     });
     res.status(201).json(product);
@@ -83,5 +84,40 @@ export const deleteProduct = async (req: Request, res: Response) => {
     res.status(204).send();
   } catch (error) {
     res.status(404).json({ error: 'Product not found' });
+  }
+};
+
+// @desc    Upload product images
+// @route   POST /api/products/:id/images
+// @access  Private/Admin
+export const uploadProductImages = async (req: Request, res: Response) => {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const files = req.files as Express.Multer.File[];
+    if (files.length < 3 || files.length > 5) {
+      return res
+        .status(400)
+        .json({ error: "Please upload between 3 and 5 images" });
+    }
+
+    const images = files.map((file) => file.path);
+
+    const updatedProduct = await prisma.product.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        images: images,
+      },
+    });
+
+    res.json(updatedProduct);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
