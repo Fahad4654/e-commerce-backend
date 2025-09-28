@@ -95,7 +95,8 @@ export const updateProduct = async (req: Request, res: Response) => {
 
   try {
     const { id } = req.params;
-    const { name, description, price, stock, imagesToDelete } = req.body;
+    const { name, description, price, stock } = req.body;
+    let { imagesToDelete } = req.body; // Make it mutable
 
     const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
     if (!product) {
@@ -103,16 +104,33 @@ export const updateProduct = async (req: Request, res: Response) => {
     }
 
     let currentImages = product.images;
+    let parsedImagesToDelete: string[] = [];
 
-    // 1. Delete images specified in imagesToDelete
-    if (imagesToDelete && Array.isArray(imagesToDelete)) {
-      imagesToDelete.forEach(imageUrl => {
-        const fullPath = path.join('public', imageUrl);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
+    // 1. Parse and delete images specified in imagesToDelete
+    if (imagesToDelete) {
+      if (typeof imagesToDelete === 'string') {
+        try {
+          // Try parsing it as a JSON array
+          parsedImagesToDelete = JSON.parse(imagesToDelete);
+        } catch (e) {
+          // Otherwise, treat it as a single URL string
+          parsedImagesToDelete = [imagesToDelete];
         }
-      });
-      currentImages = currentImages.filter(img => !imagesToDelete.includes(img));
+      } else if (Array.isArray(imagesToDelete)) {
+        parsedImagesToDelete = imagesToDelete;
+      }
+
+      if (Array.isArray(parsedImagesToDelete) && parsedImagesToDelete.length > 0) {
+        parsedImagesToDelete.forEach(imageUrl => {
+          if (typeof imageUrl === 'string' && imageUrl) {
+            const fullPath = path.join('public', imageUrl);
+            if (fs.existsSync(fullPath)) {
+              fs.unlinkSync(fullPath);
+            }
+          }
+        });
+        currentImages = currentImages.filter(img => !parsedImagesToDelete.includes(img));
+      }
     }
 
     // 2. Add new images
@@ -143,7 +161,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       }
     });
     console.error("Error updating product:", error);
-    res.status(404).json({ error: 'Product not found or invalid data' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
