@@ -59,6 +59,17 @@ export const createProduct = async (req: Request, res: Response) => {
     const { name, description, price, stock } = req.body;
 
     if (files && files.length > 0) {
+      if (files.length > 5) {
+        // Cleanup the newly uploaded files since we are aborting
+        files.forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+        return res.status(400).json({
+          error: 'A product cannot have more than 5 images.',
+        });
+      }
       imagePaths = processAndSaveImages(files, name);
     }
 
@@ -110,10 +121,8 @@ export const updateProduct = async (req: Request, res: Response) => {
     if (imagesToDelete) {
       if (typeof imagesToDelete === 'string') {
         try {
-          // Try parsing it as a JSON array
           parsedImagesToDelete = JSON.parse(imagesToDelete);
         } catch (e) {
-          // Otherwise, treat it as a single URL string
           parsedImagesToDelete = [imagesToDelete];
         }
       } else if (Array.isArray(imagesToDelete)) {
@@ -133,8 +142,19 @@ export const updateProduct = async (req: Request, res: Response) => {
       }
     }
 
-    // 2. Add new images
+    // 2. Add new images, with validation
     if (files && files.length > 0) {
+      if (currentImages.length + files.length > 5) {
+        // Cleanup the newly uploaded files since we are aborting
+        files.forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+        return res.status(400).json({
+          error: 'A product cannot have more than 5 images. Please delete some images before adding new ones.',
+        });
+      }
       newImagePaths = processAndSaveImages(files, name || product.name);
     }
 
