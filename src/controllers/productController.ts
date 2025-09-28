@@ -3,6 +3,8 @@
 
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
+import fs from 'fs';
+import path from 'path';
 
 
 // @desc    Get all products
@@ -91,6 +93,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
 // @route   POST /api/products/:id/images
 // @access  Private/Admin
 export const uploadProductImages = async (req: Request, res: Response) => {
+  let renamedFiles: string[] = [];
   try {
     const product = await prisma.product.findUnique({
       where: { id: parseInt(req.params.id) },
@@ -107,7 +110,20 @@ export const uploadProductImages = async (req: Request, res: Response) => {
         .json({ error: "Please upload between 3 and 5 images" });
     }
 
-    const images = files.map((file) => file.path);
+    const sanitizedProductName = product.name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+
+    const images = files.map((file, index) => {
+      const fileExt = path.extname(file.originalname);
+      const newFilename = `${sanitizedProductName}-${Date.now()}-${index}${fileExt}`;
+      const newPath = path.join('uploads', newFilename);
+
+      fs.renameSync(file.path, newPath);
+      renamedFiles.push(newPath);
+      return `/uploads/${newFilename}`;
+    });
 
     const updatedProduct = await prisma.product.update({
       where: { id: parseInt(req.params.id) },
@@ -118,6 +134,13 @@ export const uploadProductImages = async (req: Request, res: Response) => {
 
     res.json(updatedProduct);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    // If an error occurs, delete any files that were already renamed
+    renamedFiles.forEach(filePath => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+    console.error("File upload error:", error);
+    res.status(500).json({ error: 'Error processing file upload. Please try again.' });
   }
 };
