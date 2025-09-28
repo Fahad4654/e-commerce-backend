@@ -45,7 +45,6 @@ export const createProduct = async (req: Request, res: Response) => {
         description,
         price,
         stock,
-        images: [],
       },
     });
     res.status(201).json(product);
@@ -128,7 +127,9 @@ export const uploadProductImages = async (req: Request, res: Response) => {
     const updatedProduct = await prisma.product.update({
       where: { id: parseInt(req.params.id) },
       data: {
-        images: images,
+        images: {
+          push: images
+        }
       },
     });
 
