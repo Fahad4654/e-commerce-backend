@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import prisma from '../db/prisma';
 import fs from 'fs';
 import path from 'path';
+import csv from 'csv-parser';
 
 const processAndSaveImages = (files: Express.Multer.File[], productName: string): string[] => {
   const sanitizedProductName = productName
@@ -214,4 +215,57 @@ export const deleteProduct = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(404).json({ error: 'Product not found' });
   }
+};
+
+// @desc    Bulk upload products from CSV
+// @route   POST /api/products/bulk-upload
+// @access  Private/Admin
+export const bulkUploadProducts = async (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
+
+  const results: any[] = [];
+  const filePath = req.file.path;
+
+  fs.createReadStream(filePath)
+    .pipe(csv())
+    .on('data', (data) => results.push(data))
+    .on('end', async () => {
+      try {
+        const productsToCreate = results.map(product => {
+          // Basic validation and type conversion
+          const price = parseFloat(product.price);
+          const stock = parseInt(product.stock, 10);
+
+          if (!product.name || isNaN(price) || isNaN(stock)) {
+            throw new Error('Invalid data in CSV file. Each product must have a name, a valid price, and a valid stock quantity.');
+          }
+          
+          return {
+            name: product.name,
+            description: product.description || '',
+            price: price,
+            stock: stock,
+            images: product.images ? product.images.split(',') : [],
+          };
+        });
+
+        const result = await prisma.product.createMany({
+          data: productsToCreate,
+          skipDuplicates: true, // Optional: skip if a product with the same unique field already exists
+        });
+
+        res.status(201).json({ message: `${result.count} products created successfully.` });
+      } catch (error: any) {
+        res.status(500).json({ error: error.message || 'An error occurred during the bulk upload process.' });
+      } finally {
+        // Clean up the uploaded file
+        fs.unlinkSync(filePath);
+      }
+    })
+    .on('error', (error) => {
+      fs.unlinkSync(filePath);
+      res.status(500).json({ error: 'Error parsing CSV file.' });
+    });
 };

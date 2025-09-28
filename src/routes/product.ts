@@ -7,7 +7,8 @@ import {
   getProductById, 
   createProduct, 
   updateProduct, 
-  deleteProduct
+  deleteProduct,
+  bulkUploadProducts
 } from '../controllers/productController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { adminMiddleware } from '../middleware/adminMiddleware';
@@ -23,5 +24,6 @@ router.get('/:id', getProductById);
 router.post('/', authMiddleware, adminMiddleware, uploadMiddleware.array('images', 5), createProduct);
 router.put('/:id', authMiddleware, adminMiddleware, uploadMiddleware.array('images', 5), updateProduct);
 router.delete('/:id', authMiddleware, adminMiddleware, deleteProduct);
+router.post('/bulk-upload', authMiddleware, adminMiddleware, uploadMiddleware.single('file'), bulkUploadProducts);
 
 export default router;
