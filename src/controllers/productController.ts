@@ -6,6 +6,21 @@ import prisma from '../db/prisma';
 import fs from 'fs';
 import path from 'path';
 
+const processAndSaveImages = (files: Express.Multer.File[], productName: string): string[] => {
+  const sanitizedProductName = productName
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+
+  return files.map((file, index) => {
+    const fileExt = path.extname(file.originalname);
+    const newFilename = `${sanitizedProductName}-${Date.now()}-${index}${fileExt}`;
+    const newPath = path.join('public', 'uploads', newFilename);
+
+    fs.renameSync(file.path, newPath);
+    return `/uploads/${newFilename}`;
+  });
+};
 
 // @desc    Get all products
 // @route   GET /api/products
@@ -37,18 +52,36 @@ export const getProductById = async (req: Request, res: Response) => {
 // @route   POST /api/products
 // @access  Private/Admin
 export const createProduct = async (req: Request, res: Response) => {
+  const files = req.files as Express.Multer.File[] | undefined;
+  let imagePaths: string[] = [];
+
   try {
     const { name, description, price, stock } = req.body;
+
+    if (files && files.length > 0) {
+      imagePaths = processAndSaveImages(files, name);
+    }
+
     const product = await prisma.product.create({
       data: {
         name,
         description,
-        price,
-        stock,
+        price: parseFloat(price),
+        stock: parseInt(stock, 10),
+        images: imagePaths,
       },
     });
+
     res.status(201).json(product);
   } catch (error) {
+    // Cleanup uploaded files on error
+    imagePaths.forEach(filePath => {
+      const fullPath = path.join('public', filePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    });
+    console.error("Error creating product:", error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -57,20 +90,46 @@ export const createProduct = async (req: Request, res: Response) => {
 // @route   PUT /api/products/:id
 // @access  Private/Admin
 export const updateProduct = async (req: Request, res: Response) => {
+  const files = req.files as Express.Multer.File[] | undefined;
+  let newImagePaths: string[] = [];
+
   try {
+    const { id } = req.params;
     const { name, description, price, stock } = req.body;
-    const product = await prisma.product.update({
-      where: { id: parseInt(req.params.id) },
+
+    const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (files && files.length > 0) {
+      newImagePaths = processAndSaveImages(files, name || product.name);
+    }
+
+    const updatedProduct = await prisma.product.update({
+      where: { id: parseInt(id) },
       data: {
         name,
         description,
-        price,
-        stock,
+        price: price ? parseFloat(price) : undefined,
+        stock: stock ? parseInt(stock, 10) : undefined,
+        images: {
+          push: newImagePaths,
+        },
       },
     });
-    res.json(product);
+
+    res.json(updatedProduct);
   } catch (error) {
-    res.status(404).json({ error: 'Product not found' });
+    // Cleanup uploaded files on error
+    newImagePaths.forEach(filePath => {
+      const fullPath = path.join('public', filePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    });
+    console.error("Error updating product:", error);
+    res.status(404).json({ error: 'Product not found or invalid data' });
   }
 };
 
@@ -79,69 +138,28 @@ export const updateProduct = async (req: Request, res: Response) => {
 // @access  Private/Admin
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
-    await prisma.product.delete({
-      where: { id: parseInt(req.params.id) },
+    const { id } = req.params;
+    const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Delete images from filesystem
+    product.images.forEach(filePath => {
+      const fullPath = path.join('public', filePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
     });
+
+    await prisma.product.delete({
+      where: { id: parseInt(id) },
+    });
+
     res.status(204).send();
   } catch (error) {
     res.status(404).json({ error: 'Product not found' });
   }
 };
 
-// @desc    Upload product images
-// @route   POST /api/products/:id/images
-// @access  Private/Admin
-export const uploadProductImages = async (req: Request, res: Response) => {
-  let renamedFiles: string[] = [];
-  try {
-    const product = await prisma.product.findUnique({
-      where: { id: parseInt(req.params.id) },
-    });
-
-    if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
-    }
-
-    const files = req.files as Express.Multer.File[];
-    if (files.length < 3 || files.length > 5) {
-      return res
-        .status(400)
-        .json({ error: "Please upload between 3 and 5 images" });
-    }
-
-    const sanitizedProductName = product.name
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '');
-
-    const images = files.map((file, index) => {
-      const fileExt = path.extname(file.originalname);
-      const newFilename = `${sanitizedProductName}-${Date.now()}-${index}${fileExt}`;
-      const newPath = path.join('uploads', newFilename);
-
-      fs.renameSync(file.path, newPath);
-      renamedFiles.push(newPath);
-      return `/uploads/${newFilename}`;
-    });
-
-    const updatedProduct = await prisma.product.update({
-      where: { id: parseInt(req.params.id) },
-      data: {
-        images: {
-          push: images
-        }
-      },
-    });
-
-    res.json(updatedProduct);
-  } catch (error) {
-    // If an error occurs, delete any files that were already renamed
-    renamedFiles.forEach(filePath => {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    });
-    console.error("File upload error:", error);
-    res.status(500).json({ error: 'Error processing file upload. Please try again.' });
-  }
-};
