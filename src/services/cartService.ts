@@ -2,26 +2,38 @@
 import prisma from '../db/prisma';
 import { Prisma } from '@prisma/client';
 
-const getCart = async (identifier: number | string) => {
-  const where = typeof identifier === 'number' ? { userId: identifier } : { guestId: identifier };
-  const cart = await prisma.cart.findFirst({
-    where,
-    include: {
-      items: {
-        include: {
-          product: true,
-        },
-      },
-    },
-  });
+const getCart = async (userId?: number, guestId?: string) => {
+    if (!userId && !guestId) {
+        return null;
+    }
 
-  return cart;
+    const where: Prisma.CartWhereInput = {};
+    if (userId) {
+        where.userId = userId;
+    } else {
+        where.guestId = guestId;
+    }
+
+    const cart = await prisma.cart.findFirst({
+        where,
+        include: {
+            items: {
+                include: {
+                    product: true,
+                },
+            },
+        },
+    });
+
+    return cart;
 };
 
-const createCart = async (identifier: number | string) => {
-    const data: Prisma.CartUncheckedCreateInput = typeof identifier === 'number'
-      ? { userId: identifier }
-      : { guestId: identifier };
+const createCart = async (userId?: number, guestId?: string) => {
+    if (!userId && !guestId) {
+        throw new Error("Either a userId or guestId must be provided");
+    }
+
+    const data: Prisma.CartUncheckedCreateInput = userId ? { userId } : { guestId: guestId! };
     const newCart = await prisma.cart.create({ data });
 
 
@@ -31,15 +43,15 @@ const createCart = async (identifier: number | string) => {
     }
   };
 
-const addItemToCart = async (identifier: number | string, productId: number, quantity: number) => {
+const addItemToCart = async (userId: number | undefined, guestId: string | undefined, productId: number, quantity: number) => {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
     throw new Error('Product not found');
   }
 
-  let cart = await getCart(identifier);
+  let cart = await getCart(userId, guestId);
   if (!cart) {
-    cart = await createCart(identifier);
+    cart = await createCart(userId, guestId);
   }
 
   const existingItem = await prisma.cartItem.findFirst({
@@ -53,7 +65,7 @@ const addItemToCart = async (identifier: number | string, productId: number, qua
   if (existingItem) {
     const newQuantity = existingItem.quantity + quantity;
     if (product.stock < newQuantity) {
-      throw new Error('Not enough stock available');
+      throw new Error('Insufficient stock');
     }
     cartItem = await prisma.cartItem.update({
       where: { id: existingItem.id },
@@ -61,7 +73,7 @@ const addItemToCart = async (identifier: number | string, productId: number, qua
     });
   } else {
     if (product.stock < quantity) {
-      throw new Error('Not enough stock available');
+      throw new Error('Insufficient stock');
     }
     cartItem = await prisma.cartItem.create({
       data: {
@@ -72,11 +84,11 @@ const addItemToCart = async (identifier: number | string, productId: number, qua
     });
   }
 
-  return cartItem;
+  return await getCart(userId, guestId);
 };
 
-const updateCartItem = async (identifier: number | string, itemId: number, quantity: number) => {
-    const cart = await getCart(identifier);
+const updateCartItem = async (userId: number | undefined, guestId: string | undefined, itemId: number, quantity: number) => {
+    const cart = await getCart(userId, guestId);
     if (!cart) {
         throw new Error('Cart not found');
     }
@@ -93,20 +105,25 @@ const updateCartItem = async (identifier: number | string, itemId: number, quant
         throw new Error('Cart item not found');
     }
 
-    if (cartItem.product.stock < quantity) {
-        throw new Error('Not enough stock available');
+    if (quantity > 0 && cartItem.product.stock < quantity) {
+        throw new Error('Insufficient stock');
     }
 
-    const updatedItem = await prisma.cartItem.update({
-        where: { id: itemId },
-        data: { quantity },
-    });
+    if (quantity <= 0) {
+        await prisma.cartItem.delete({ where: { id: itemId } });
+    } else {
+        await prisma.cartItem.update({
+            where: { id: itemId },
+            data: { quantity },
+        });
+    }
 
-    return updatedItem;
+
+    return await getCart(userId, guestId);
 }
 
-const removeCartItem = async (identifier: number | string, itemId: number) => {
-    const cart = await getCart(identifier);
+const removeCartItem = async (userId: number | undefined, guestId: string | undefined, itemId: number) => {
+    const cart = await getCart(userId, guestId);
     if (!cart) {
         throw new Error('Cart not found');
     }
@@ -123,6 +140,8 @@ const removeCartItem = async (identifier: number | string, itemId: number) => {
     }
 
     await prisma.cartItem.delete({ where: { id: itemId } });
+
+    return await getCart(userId, guestId);
 }
 
 
