@@ -95,33 +95,47 @@ export const updateProduct = async (req: Request, res: Response) => {
 
   try {
     const { id } = req.params;
-    const { name, description, price, stock } = req.body;
+    const { name, description, price, stock, imagesToDelete } = req.body;
 
     const product = await prisma.product.findUnique({ where: { id: parseInt(id) } });
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    let currentImages = product.images;
+
+    // 1. Delete images specified in imagesToDelete
+    if (imagesToDelete && Array.isArray(imagesToDelete)) {
+      imagesToDelete.forEach(imageUrl => {
+        const fullPath = path.join('public', imageUrl);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      });
+      currentImages = currentImages.filter(img => !imagesToDelete.includes(img));
+    }
+
+    // 2. Add new images
     if (files && files.length > 0) {
       newImagePaths = processAndSaveImages(files, name || product.name);
     }
 
+    const dataToUpdate: any = {
+      name,
+      description,
+      price: price ? parseFloat(price) : undefined,
+      stock: stock ? parseInt(stock, 10) : undefined,
+      images: [...currentImages, ...newImagePaths],
+    };
+
     const updatedProduct = await prisma.product.update({
       where: { id: parseInt(id) },
-      data: {
-        name,
-        description,
-        price: price ? parseFloat(price) : undefined,
-        stock: stock ? parseInt(stock, 10) : undefined,
-        images: {
-          push: newImagePaths,
-        },
-      },
+      data: dataToUpdate,
     });
 
     res.json(updatedProduct);
   } catch (error) {
-    // Cleanup uploaded files on error
+    // Cleanup newly uploaded files on error
     newImagePaths.forEach(filePath => {
       const fullPath = path.join('public', filePath);
       if (fs.existsSync(fullPath)) {
@@ -132,6 +146,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     res.status(404).json({ error: 'Product not found or invalid data' });
   }
 };
+
 
 // @desc    Delete a product
 // @route   DELETE /api/products/:id
@@ -162,4 +177,3 @@ export const deleteProduct = async (req: Request, res: Response) => {
     res.status(404).json({ error: 'Product not found' });
   }
 };
-
