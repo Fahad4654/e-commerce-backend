@@ -12,7 +12,7 @@ import {
 } from '../controllers/productController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { adminMiddleware } from '../middleware/adminMiddleware';
-import { imageUploadMiddleware, csvUploadMiddleware } from '../middleware/uploadMiddleware';
+import { imageUploadMiddleware, fileUploadMiddleware } from '../middleware/uploadMiddleware';
 
 const router = Router();
 
@@ -24,6 +24,6 @@ router.get('/:id', getProductById);
 router.post('/', authMiddleware, adminMiddleware, imageUploadMiddleware.array('images', 5), createProduct);
 router.put('/:id', authMiddleware, adminMiddleware, imageUploadMiddleware.array('images', 5), updateProduct);
 router.delete('/:id', authMiddleware, adminMiddleware, deleteProduct);
-router.post('/bulk-upload', authMiddleware, adminMiddleware, csvUploadMiddleware.single('file'), bulkUploadProducts);
+router.post('/bulk-upload', authMiddleware, adminMiddleware, fileUploadMiddleware.single('file'), bulkUploadProducts);
 
 export default router;

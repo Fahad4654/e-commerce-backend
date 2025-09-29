@@ -1,4 +1,3 @@
-
 import multer from "multer";
 import path from "path";
 
@@ -26,13 +25,21 @@ const imageFileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
-// File filter for CSV files
-const csvFileFilter = (req: any, file: any, cb: any) => {
-    if (file.mimetype === 'text/csv' || path.extname(file.originalname).toLowerCase() === '.csv') {
+// File filter for CSV & Excel files
+const fileFilter = (req: any, file: any, cb: any) => {
+    const allowedMimeTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+
+    if (allowedMimeTypes.includes(file.mimetype)) {
         return cb(null, true);
     }
-    cb(new Error("Only .csv format allowed!"), false);
+    
+    cb(new Error("Only .csv, .xls, and .xlsx formats are allowed!"), false);
 }
+
 
 // Multer upload instance for images
 export const imageUploadMiddleware = multer({
@@ -43,8 +50,8 @@ export const imageUploadMiddleware = multer({
   fileFilter: imageFileFilter,
 });
 
-// Multer upload instance for CSVs
-export const csvUploadMiddleware = multer({
+// Multer upload instance for CSVs and Excel files
+export const fileUploadMiddleware = multer({
     storage: storage,
-    fileFilter: csvFileFilter,
+    fileFilter: fileFilter,
 });

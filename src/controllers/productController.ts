@@ -6,6 +6,7 @@ import prisma from '../db/prisma';
 import fs from 'fs';
 import path from 'path';
 import csv from 'csv-parser';
+import * as XLSX from 'xlsx';
 
 const processAndSaveImages = (files: Express.Multer.File[], productName: string): string[] => {
   const sanitizedProductName = productName
@@ -261,61 +262,85 @@ export const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Bulk upload products from CSV
+// @desc    Bulk upload products from CSV or Excel
 // @route   POST /api/products/bulk-upload
 // @access  Private/Admin
 export const bulkUploadProducts = async (req: Request, res: Response) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded.' });
+    return res.status(400).json({ error: "No file uploaded." });
   }
 
-  const results: any[] = [];
   const filePath = req.file.path;
+  let results: any[] = [];
 
-  fs.createReadStream(filePath)
-    .pipe(csv())
-    .on('data', (data) => results.push(data))
-    .on('end', async () => {
-      try {
-        const productsToCreate = results.map(product => {
-          // Basic validation and type conversion
-          const price = parseFloat(product.price);
-          const stock = parseInt(product.stock, 10);
-          const categoryId = parseInt(product.categoryId, 10); // Add categoryId
+  try {
+    const fileType = req.file.mimetype;
 
-          if (!product.name || isNaN(price) || isNaN(stock) || isNaN(categoryId)) {
-            throw new Error('Invalid data in CSV file. Each product must have a name, a valid price, a valid stock quantity, and a valid categoryId.');
-          }
-
-          return {
-            name: product.name,
-            description: product.description || '',
-            price: price,
-            stock: stock,
-            unit: product.unit || 'unit',
-            images: product.images ? product.images.split(',') : [],
-            categoryId: categoryId, // Add categoryId
-          };
-        });
-
-        // I should also check if all the categoryIds are valid before attempting to create the products.
-        // This is a bit more complex, so I'll leave it for a future improvement.
-
-        const result = await prisma.product.createMany({
-          data: productsToCreate,
-          skipDuplicates: true, // Optional: skip if a product with the same unique field already exists
-        });
-
-        res.status(201).json({ message: `${result.count} products created successfully.` });
-      } catch (error: any) {
-        res.status(500).json({ error: error.message || 'An error occurred during the bulk upload process.' });
-      } finally {
-        // Clean up the uploaded file
-        fs.unlinkSync(filePath);
-      }
-    })
-    .on('error', (error) => {
+    if (fileType === "text/csv") {
+      await new Promise<void>((resolve, reject) => {
+        fs.createReadStream(filePath)
+          .pipe(csv())
+          .on("data", (data) => results.push(data))
+          .on("end", () => resolve())
+          .on("error", (error) => reject(error));
+      });
+    } else if (
+      fileType === "application/vnd.ms-excel" ||
+      fileType ===
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ) {
+      const workbook = XLSX.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      results = XLSX.utils.sheet_to_json(worksheet);
+    } else {
       fs.unlinkSync(filePath);
-      res.status(500).json({ error: 'Error parsing CSV file.' });
+      return res.status(400).json({ error: "Unsupported file type." });
+    }
+
+    const productsToCreate = results.map((product) => {
+      const price = parseFloat(product.price);
+      const stock = parseInt(product.stock, 10);
+      const categoryId = parseInt(product.categoryId, 10);
+
+      if (
+        !product.name ||
+        isNaN(price) ||
+        isNaN(stock) ||
+        isNaN(categoryId)
+      ) {
+        throw new Error(
+          "Invalid data in file. Each product must have a name, a valid price, a valid stock quantity, and a valid categoryId."
+        );
+      }
+
+      return {
+        name: product.name,
+        description: product.description || "",
+        price: price,
+        stock: stock,
+        unit: product.unit || "unit",
+        images: product.images ? product.images.split(",") : [],
+        categoryId: categoryId,
+      };
     });
+
+    const result = await prisma.product.createMany({
+      data: productsToCreate,
+      skipDuplicates: true,
+    });
+
+    res
+      .status(201)
+      .json({ message: `${result.count} products created successfully.` });
+  } catch (error: any) {
+    res.status(500).json({
+      error:
+        error.message || "An error occurred during the bulk upload process.",
+    });
+  } finally {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
 };
