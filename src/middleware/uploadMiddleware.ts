@@ -13,8 +13,8 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter to allow only specific image types
-const fileFilter = (req: any, file: any, cb: any) => {
+// File filter for images
+const imageFileFilter = (req: any, file: any, cb: any) => {
   const allowedTypes = /jpeg|jpg|png/;
   const mimetype = allowedTypes.test(file.mimetype);
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -26,13 +26,25 @@ const fileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
-// Multer upload instance
-const upload = multer({
+// File filter for CSV files
+const csvFileFilter = (req: any, file: any, cb: any) => {
+    if (file.mimetype === 'text/csv' || path.extname(file.originalname).toLowerCase() === '.csv') {
+        return cb(null, true);
+    }
+    cb(new Error("Only .csv format allowed!"), false);
+}
+
+// Multer upload instance for images
+export const imageUploadMiddleware = multer({
   storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5 MB file size limit
   },
-  fileFilter: fileFilter,
+  fileFilter: imageFileFilter,
 });
 
-export const uploadMiddleware = upload;
+// Multer upload instance for CSVs
+export const csvUploadMiddleware = multer({
+    storage: storage,
+    fileFilter: csvFileFilter,
+});
