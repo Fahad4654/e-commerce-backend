@@ -6,7 +6,7 @@ import prisma from '../db/prisma';
 
 export const getCategories = async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, sortBy = 'name', sortOrder = 'asc' } = req.query;
+    const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
