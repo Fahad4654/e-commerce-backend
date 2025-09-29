@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     id: number;
     isAdmin: boolean;
   };
+  guestId?: string;
 }
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
