@@ -4,6 +4,19 @@
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
 
+// Define the fields that are safe to be publicly exposed
+const userPublicFields = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  address: true,
+  role: true,
+  refreshToken: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private/Admin
@@ -21,14 +34,7 @@ export const getUsers = async (req: Request, res: Response) => {
       orderBy: {
         [sortBy as string]: sortOrder as 'asc' | 'desc',
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userPublicFields,
     });
 
     const totalUsers = await prisma.user.count();
@@ -51,14 +57,7 @@ export const getUserById = async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = await prisma.user.findUnique({
       where: { id: parseInt(id) },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userPublicFields,
     });
 
     if (user) {
@@ -77,7 +76,7 @@ export const getUserById = async (req: Request, res: Response) => {
 export const updateUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, email, role } = req.body;
+    const { name, email, role, phone, address } = req.body;
 
     const updatedUser = await prisma.user.update({
       where: { id: parseInt(id) },
@@ -85,23 +84,21 @@ export const updateUser = async (req: Request, res: Response) => {
         name,
         email,
         role,
+        phone,
+        address,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: userPublicFields,
     });
 
     res.json(updatedUser);
   } catch (error) {
-    // P2025 is Prisma's error code for when a record to update is not found
     // @ts-ignore
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'User not found' });
+    }
+    // @ts-ignore
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Email or phone number is already in use.' });
     }
     res.status(500).json({ error: 'Failed to update user' });
   }
