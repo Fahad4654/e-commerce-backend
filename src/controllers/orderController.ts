@@ -34,10 +34,14 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
     const total = cart.items.reduce((sum, item) => sum + item.quantity * item.product.price, 0);
 
+    const identifierData = 'id' in userIdentifier 
+      ? { userId: userIdentifier.id } 
+      : { guestId: userIdentifier.guestId };
+
     // Create the order with order items
     const order = await prisma.order.create({
       data: {
-        ...( 'id' in userIdentifier ? { userId: userIdentifier.id } : { guestId: userIdentifier.guestId }),
+        ...identifierData,
         total,
         items: {
           create: cart.items.map((item) => ({
