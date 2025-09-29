@@ -135,3 +135,62 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Error updating order status', error: message });
   }
 };
+
+// Get orders for the authenticated user
+export const getUserOrders = async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.id;
+  const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+  if (!userId) {
+    return res.status(401).json({ message: 'Unauthorized. User not authenticated.' });
+  }
+
+  const pageNum = parseInt(page as string, 10);
+  const limitNum = parseInt(limit as string, 10);
+  const offset = (pageNum - 1) * limitNum;
+
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        userId: userId,
+      },
+      skip: offset,
+      take: limitNum,
+      orderBy: {
+        [sortBy as string]: sortOrder as 'asc' | 'desc',
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    const totalUserOrders = await prisma.order.count({
+      where: {
+        userId: userId,
+      },
+    });
+
+    if (orders.length === 0) {
+      return res.status(200).json({ 
+        message: 'You have not placed any orders yet.',
+        orders: [],
+        totalPages: 0,
+        currentPage: 1,
+      });
+    }
+
+    res.json({
+      orders,
+      totalPages: Math.ceil(totalUserOrders / limitNum),
+      currentPage: pageNum,
+    });
+
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ message: 'Failed to fetch your orders', error: message });
+  }
+};
