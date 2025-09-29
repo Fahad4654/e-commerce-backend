@@ -1,104 +1,148 @@
 
+// src/controllers/cartController.ts
+
 import { Response } from 'express';
-import * as cartService from '../services/cartService';
+import prisma from '../db/prisma';
 import { AuthRequest } from '../middleware/authMiddleware';
 
-export const getCart = async (req: AuthRequest, res: Response) => {
-  const userId = req.user?.id;
-  const guestId = req.guestId;
+// Utility function to find or create a cart for a user or guest
+async function findOrCreateCart(userIdentifier: { id: number } | { guestId: string }) {
+  let cart;
+  const where = 'id' in userIdentifier ? { userId: userIdentifier.id } : { guestId: userIdentifier.guestId };
 
-  if (!userId && !guestId) {
-    return res.status(401).json({ message: 'Unauthorized' });
+  cart = await prisma.cart.findUnique({ where, include: { items: { include: { product: true } } } });
+
+  if (!cart) {
+    cart = await prisma.cart.create({
+      data: { ...where },
+      include: { items: { include: { product: true } } },
+    });
   }
 
+  return cart;
+}
+
+
+// Get the current user's or guest's cart
+export const getCart = async (req: AuthRequest, res: Response) => {
   try {
-    const cart = await cartService.getCart(userId, guestId);
+    const userIdentifier = req.user ? { id: req.user.id } : { guestId: req.guestId! };
+    const cart = await findOrCreateCart(userIdentifier);
     res.json(cart);
   } catch (error) {
-    if (error instanceof Error) {
-        if (error.message === 'Cart not found') {
-            return res.status(404).json({ message: error.message });
-        }
-        return res.status(500).json({ message: 'Error getting cart', error: error.message });
-    }
-    res.status(500).json({ message: 'Error getting cart', error: 'An unknown error occurred' });
+    console.error('Error getting cart:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-export const addItemToCart = async (req: AuthRequest, res: Response) => {
-  const { productId, quantity } = req.body;
-  const userId = req.user?.id;
-  const guestId = req.guestId;
 
-  if (!userId && !guestId) {
-    return res.status(401).json({ message: 'Unauthorized' });
+// Add an item to the cart
+export const addToCart = async (req: AuthRequest, res: Response) => {
+  const { productId, quantity } = req.body;
+
+  if (!productId || !quantity || quantity <= 0) {
+    return res.status(400).json({ error: 'Product ID and a valid quantity are required' });
   }
 
   try {
-    const cart = await cartService.addItemToCart(userId, guestId, productId, quantity);
-    res.status(201).json(cart);
-  } catch (error) {
-    if (error instanceof Error) {
-        switch (error.message) {
-            case 'Product not found':
-                return res.status(404).json({ message: error.message });
-            case 'Insufficient stock':
-                return res.status(400).json({ message: error.message });
-            default:
-                return res.status(500).json({ message: 'Error adding item to cart', error: error.message });
-        }
+    const userIdentifier = req.user ? { id: req.user.id } : { guestId: req.guestId! };
+    const cart = await findOrCreateCart(userIdentifier);
+
+    const existingItem = await prisma.cartItem.findFirst({
+      where: { cartId: cart.id, productId },
+    });
+
+    if (existingItem) {
+      // If item exists, update its quantity
+      await prisma.cartItem.update({
+        where: { id: existingItem.id },
+        data: { quantity: existingItem.quantity + quantity },
+      });
+    } else {
+      // If item does not exist, create a new cart item
+      await prisma.cartItem.create({
+        data: { cartId: cart.id, productId, quantity },
+      });
     }
-    res.status(500).json({ message: 'Error adding item to cart', error: 'An unknown error occurred' });
+
+    const updatedCart = await prisma.cart.findUnique({ 
+        where: { id: cart.id },
+        include: { items: { include: { product: true } } } 
+    });
+
+    res.status(200).json(updatedCart);
+  } catch (error) {
+    console.error('Error adding to cart:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+
+// Update a cart item's quantity
 export const updateCartItem = async (req: AuthRequest, res: Response) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
-  const userId = req.user?.id;
-  const guestId = req.guestId;
 
-  if (!userId && !guestId) {
-    return res.status(401).json({ message: 'Unauthorized' });
+  if (!quantity || quantity <= 0) {
+    return res.status(400).json({ error: 'A valid quantity is required' });
   }
 
   try {
-    const cart = await cartService.updateCartItem(userId, guestId, parseInt(itemId), quantity);
-    res.json(cart);
-  } catch (error) {
-    if (error instanceof Error) {
-        switch (error.message) {
-            case 'Cart item not found':
-                return res.status(404).json({ message: error.message });
-            case 'Insufficient stock':
-                return res.status(400).json({ message: error.message });
-            default:
-                return res.status(500).json({ message: 'Error updating cart item', error: error.message });
-        }
+    const userIdentifier = req.user ? { id: req.user.id } : { guestId: req.guestId! };
+    const cart = await findOrCreateCart(userIdentifier);
+
+    const itemToUpdate = await prisma.cartItem.findFirst({
+        where: { id: parseInt(itemId, 10), cartId: cart.id }
+    });
+
+    if(!itemToUpdate){
+        return res.status(404).json({ error: 'Cart item not found or does not belong to the user' });
     }
-    res.status(500).json({ message: 'Error updating cart item', error: 'An unknown error occurred' });
+
+    await prisma.cartItem.update({
+      where: { id: parseInt(itemId, 10) },
+      data: { quantity },
+    });
+
+    const updatedCart = await prisma.cart.findUnique({ 
+        where: { id: cart.id },
+        include: { items: { include: { product: true } } } 
+    });
+
+    res.json(updatedCart);
+  } catch (error) {
+    console.error('Error updating cart item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-export const removeCartItem = async (req: AuthRequest, res: Response) => {
-    const { itemId } = req.params;
-    const userId = req.user?.id;
-    const guestId = req.guestId;
-  
-    if (!userId && !guestId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+
+// Remove an item from the cart
+export const removeFromCart = async (req: AuthRequest, res: Response) => {
+  const { itemId } = req.params;
+
+  try {
+    const userIdentifier = req.user ? { id: req.user.id } : { guestId: req.guestId! };
+    const cart = await findOrCreateCart(userIdentifier);
+
+    const itemToRemove = await prisma.cartItem.findFirst({
+        where: { id: parseInt(itemId, 10), cartId: cart.id }
+    });
+
+    if(!itemToRemove){
+        return res.status(404).json({ error: 'Cart item not found or does not belong to the user' });
     }
-  
-    try {
-        const cart = await cartService.removeCartItem(userId, guestId, parseInt(itemId));
-        res.status(200).json(cart);
-      } catch (error) {
-        if (error instanceof Error) {
-            if (error.message === 'Cart item not found') {
-                return res.status(404).json({ message: error.message });
-            }
-            return res.status(500).json({ message: 'Error removing cart item', error: error.message });
-        }
-        res.status(500).json({ message: 'Error removing cart item', error: 'An unknown error occurred' });
-      }
-  };
+
+    await prisma.cartItem.delete({ where: { id: parseInt(itemId, 10) } });
+
+    const updatedCart = await prisma.cart.findUnique({ 
+        where: { id: cart.id },
+        include: { items: { include: { product: true } } } 
+    });
+
+    res.json(updatedCart);
+  } catch (error) {
+    console.error('Error removing from cart:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
