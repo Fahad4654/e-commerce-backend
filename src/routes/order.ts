@@ -1,4 +1,6 @@
 
+// src/routes/order.ts
+
 import { Router } from 'express';
 import {
   createOrder,
@@ -17,13 +19,12 @@ router.post('/', authMiddleware, guestMiddleware, createOrder);
 // GET /api/orders/my-orders - Get all orders for the authenticated user
 router.get('/my-orders', authMiddleware, getUserOrders);
 
-// All other order routes are protected and for admins only
-router.use(authMiddleware, adminMiddleware);
+// --- Admin Only Routes ---
 
-// GET /api/orders - Get all orders (admins only)
-router.get('/', getAllOrders);
+// GET /api/orders - Get all orders
+router.get('/', authMiddleware, adminMiddleware, getAllOrders);
 
-// PUT /api/orders/:orderId/status - Update order status (admins only)
-router.put('/:orderId/status', updateOrderStatus);
+// PUT /api/orders/:orderId/status - Update order status
+router.put('/:orderId/status', authMiddleware, adminMiddleware, updateOrderStatus);
 
 export default router;
