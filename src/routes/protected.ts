@@ -11,6 +11,10 @@ router.get(
   '/profile',
   authMiddleware,
   async (req: AuthRequest, res: Response) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required to access this resource.' });
+    }
+
     try {
       const user = await prisma.user.findUnique({
         where: { id: req.user.id },
