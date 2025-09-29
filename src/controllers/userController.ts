@@ -4,6 +4,9 @@
 import { Request, Response } from 'express';
 import prisma from '../db/prisma';
 
+// @desc    Get all users
+// @route   GET /api/users
+// @access  Private/Admin
 export const getUsers = async (req: Request, res: Response) => {
   const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
@@ -40,6 +43,73 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
+// @desc    Get a single user by ID
+// @route   GET /api/users/:id
+// @access  Private/Admin
+export const getUserById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(id) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// @desc    Update a user
+// @route   PUT /api/users/:id
+// @access  Private/Admin
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, email, role } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: {
+        name,
+        email,
+        role,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    // P2025 is Prisma's error code for when a record to update is not found
+    // @ts-ignore
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+};
+
+// @desc    Delete a user
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
