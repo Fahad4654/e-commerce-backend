@@ -12,7 +12,6 @@ const userPublicFields = {
   phone: true,
   address: true,
   role: true,
-  refreshToken: true,
   createdAt: true,
   updatedAt: true,
 };
