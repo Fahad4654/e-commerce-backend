@@ -78,17 +78,32 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 
 // Get all orders (for admins)
 export const getAllOrders = async (req: AuthRequest, res: Response) => {
+  const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+  const pageNum = parseInt(page as string, 10);
+  const limitNum = parseInt(limit as string, 10);
+  const offset = (pageNum - 1) * limitNum;
+
   try {
     const orders = await prisma.order.findMany({
+      skip: offset,
+      take: limitNum,
+      orderBy: {
+        [sortBy as string]: sortOrder as 'asc' | 'desc',
+      },
       include: {
         user: { select: { id: true, name: true, email: true } }, // Include user details
         items: { include: { product: true } }, // Include order items and products
       },
-      orderBy: {
-        createdAt: 'desc', // Show newest orders first
-      },
     });
-    res.json(orders);
+
+    const totalOrders = await prisma.order.count();
+
+    res.json({
+      orders,
+      totalPages: Math.ceil(totalOrders / limitNum),
+      currentPage: pageNum,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
     res.status(500).json({ message: 'Error fetching orders', error: message });

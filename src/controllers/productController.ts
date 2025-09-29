@@ -28,12 +28,34 @@ const processAndSaveImages = (files: Express.Multer.File[], productName: string)
 // @route   GET /api/products
 // @access  Public
 export const getProducts = async (req: Request, res: Response) => {
-  const products = await prisma.product.findMany({
-    include: {
-      category: true, // Also fetch category info
-    },
-  });
-  res.json(products);
+  const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+  const pageNum = parseInt(page as string, 10);
+  const limitNum = parseInt(limit as string, 10);
+  const offset = (pageNum - 1) * limitNum;
+
+  try {
+    const products = await prisma.product.findMany({
+      skip: offset,
+      take: limitNum,
+      orderBy: {
+        [sortBy as string]: sortOrder as 'asc' | 'desc',
+      },
+      include: {
+        category: true, // Also fetch category info
+      },
+    });
+
+    const totalProducts = await prisma.product.count();
+
+    res.json({
+      products,
+      totalPages: Math.ceil(totalProducts / limitNum),
+      currentPage: pageNum,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
 };
 
 // @desc    Get a single product
