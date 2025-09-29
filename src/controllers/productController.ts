@@ -272,7 +272,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
       where: { id: parseInt(id) },
     });
 
-    res.status(204).send();
+    res.status(200).json({ message: 'Product deleted successfully' });
   } catch (error) {
     // The error on delete is likely due to foreign key constraints
     // (e.g. product is in an order). Prisma's default behavior on delete is to throw an error.

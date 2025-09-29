@@ -39,3 +39,15 @@ export const getUsers = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 };
+
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.user.delete({
+      where: { id: parseInt(id) },
+    });
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete user" });
+  }
+};
