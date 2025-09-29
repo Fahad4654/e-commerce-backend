@@ -8,7 +8,7 @@ import prisma from '../db/prisma';
 export interface AuthRequest extends Request {
   user?: {
     id: number;
-    isAdmin: boolean;
+    role: string;
   };
   guestId?: string;
 }
@@ -32,7 +32,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
 
     req.user = {
       id: user.id,
-      isAdmin: user.role === 'admin',
+      role: user.role,
     };
 
     next();
