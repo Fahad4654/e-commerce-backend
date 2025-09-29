@@ -1,41 +1,41 @@
 
-import { Request as ExpressRequest, Response, NextFunction } from 'express';
-import { verifyToken } from '../auth/auth';
+// src/middleware/authMiddleware.ts
 
-// Define the custom request type that includes the user property
-export type AuthRequest = ExpressRequest & {
-  user?: any; // Consider creating a more specific user type
-  guestId?: string;
-};
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import prisma from '../db/prisma';
 
-export const authMiddleware = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ message: 'Unauthorized' });
+export interface AuthRequest extends Request {
+  user?: {
+    id: number;
+    role: string;
+  };
+}
+
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+
+  if (!token) {
+    return res.status(401).json({ message: 'Authentication required' });
   }
 
-  const token = authHeader.split(' ')[1];
   try {
-    const decoded = verifyToken(token);
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      userId: number;
+    };
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    req.user = {
+      id: user.id,
+      role: user.role,
+    };
+
     next();
   } catch (error) {
-    return res.status(401).json({ message: 'Invalid token' });
-  }
-};
-
-export const adminMiddleware = (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Forbidden: Admins only' });
+    res.status(401).json({ message: 'Invalid token' });
   }
 };

@@ -8,7 +8,8 @@ import {
   updateOrderStatus,
   getUserOrders,
 } from '../controllers/orderController';
-import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { adminMiddleware } from '../middleware/adminMiddleware';
 import { guestMiddleware } from '../middleware/guestMiddleware';
 
 const router = Router();
