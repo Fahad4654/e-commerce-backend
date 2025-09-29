@@ -8,6 +8,7 @@ import protectedRoutes from "./routes/protected";
 import productRoutes from "./routes/product"; // Import product routes
 import orderRoutes from "./routes/order"; // Import order routes
 import cartRoutes from "./routes/cart"; // Import cart routes
+import categoryRoutes from "./routes/category"; // Import category routes
 import { createAdminUserIfNotExists } from "./utils/startup";
 import { guestMiddleware } from "./middleware/guestMiddleware";
 import { logRoutes } from "./utils/routeLogger";
@@ -45,6 +46,7 @@ app.use("/api", protectedRoutes);
 app.use("/api/products", productRoutes); // Add product routes
 app.use("/api/orders", orderRoutes); // Add order routes
 app.use("/api/cart", cartRoutes); // Add cart routes
+app.use("/api/categories", categoryRoutes); // Add category routes
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -62,6 +64,7 @@ createAdminUserIfNotExists()
       logRoutes("/api/products", productRoutes);
       logRoutes("/api/orders", orderRoutes);
       logRoutes("/api/cart", cartRoutes);
+      logRoutes("/api/categories", categoryRoutes);
     });
   })
   .catch((error) => {
